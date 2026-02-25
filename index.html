@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบแจ้งเหตุไฟฟ้า - กฟภ.คีรีรัฐนิคม</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; width: 100%; max-width: 400px; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #00b900; text-align: center; margin-bottom: 20px; }
+        .user-info { background: #e8f5e9; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input, textarea { width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 15px; background-color: #00b900; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #009e00; }
+        #status { text-align: center; color: #666; margin-top: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🚨 แจ้งเหตุไฟฟ้า</h2>
+        <div id="userInfo" class="user-info">กำลังโหลดข้อมูลผู้แจ้ง...</div>
+        
+        <label>📱 เบอร์โทรศัพท์ติดต่อ</label>
+        <input type="tel" id="phone" placeholder="กรุณาระบุเบอร์โทรศัพท์" required>
+        
+        <label>📍 รายละเอียดเหตุ/สถานที่</label>
+        <textarea id="detail" rows="4" placeholder="ระบุรายละเอียดเพิ่มเติม เช่น เสื้อไฟดับ, กิ่งไม้ทับสายไฟ"></textarea>
+        
+        <button id="btnSend" onclick="sendData()">ยืนยันส่งข้อมูลแจ้งเหตุ</button>
+        <p id="status">ระบบจะดึงพิกัด GPS อัตโนมัติ</p>
+    </div>
+
+    <script>
+        // ข้อมูลอ้างอิงจากรูปที่คุณส่งมา
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxXpdoxQCG512Ryle1BEaJ_ssU42X4U79nL0eCbeH8-k0B9W35Y_jPqCj_72_5W71Y6/exec";
+        const LIFF_ID = "2009235523-P510E576"; // รหัสจาก Channel ID ของคุณ
+
+        let profileName = "";
+        let coords = { lat: 0, lng: 0 };
+
+        async function main() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    const profile = await liff.getProfile();
+                    profileName = profile.displayName;
+                    document.getElementById('userInfo').innerText = "ผู้แจ้ง: " + profileName;
+                    
+                    // ขอพิกัด GPS
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        coords.lat = pos.coords.latitude;
+                        coords.lng = pos.coords.longitude;
+                        document.getElementById('status').innerText = "📍 บันทึกพิกัดเรียบร้อย";
+                        document.getElementById('status').style.color = "blue";
+                    }, err => {
+                        document.getElementById('status').innerText = "⚠️ ไม่สามารถเข้าถึงพิกัดได้";
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        main();
+
+        async function sendData() {
+            const phone = document.getElementById('phone').value;
+            const detail = document.getElementById('detail').value;
+            const btn = document.getElementById('btnSend');
+
+            if (!phone) return alert("กรุณาระบุเบอร์โทรศัพท์ด้วยครับ");
+
+            btn.disabled = true;
+            btn.innerText = "กำลังส่งข้อมูล...";
+
+            const payload = {
+                displayName: profileName,
+                lat: coords.lat,
+                lng: coords.lng,
+                phone: phone,
+                detail: detail
+            };
+
+            try {
+                // ส่งข้อมูลไป Google Sheets
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                alert("✅ ส่งข้อมูลแจ้งเหตุเรียบร้อยแล้ว เจ้าหน้าที่จะดำเนินการตรวจสอบโดยเร็ว");
+                liff.closeWindow();
+            } catch (error) {
+                alert("❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+                btn.disabled = false;
+                btn.innerText = "ยืนยันส่งข้อมูลแจ้งเหตุ";
+            }
+        }
+    </script>
+</body>
+</html>
